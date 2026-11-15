@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>smoke</title></head>
+<body>
+<div id="hex"></div>
+<div id="tree"></div>
+<div id="result">PENDING</div>
+<script type="module">
+  import { decodeMessage, fromHex } from './dist/core/decoder.js';
+  import { renderHexView, deepestNodeAt } from './dist/ui/hexview.js';
+  import { renderTree } from './dist/ui/tree.js';
+  import { modbusMeter } from './dist/protocols/library.js';
+  import { guessProtocol } from './dist/core/guess.js';
+  import { computeStats } from './dist/core/stats.js';
+
+  const checks = [];
+  const ok = (name, cond) => checks.push(`${cond ? 'PASS' : 'FAIL'} ${name}`);
+
+  // 解码 + hex 视图 + 树(用编码器生成合法报文)
+  const { encodeMessage } = await import('./dist/core/encoder.js');
+  const buf = encodeMessage(modbusMeter, { header: '55aa', addr: 1, func: 3, seq: 300, regs: [1.5, 2.5, 3.5] });
+  const r = decodeMessage(buf, modbusMeter);
+  ok('decode ok', r.ok);
+  const hexEl = document.getElementById('hex');
+  const handle = renderHexView(hexEl, buf, r.root, () => {});
+  ok('hex spans', hexEl.querySelectorAll('span.b').length === buf.length);
+  handle.highlight(0, 2);
+  ok('hex highlight', hexEl.querySelectorAll('span.b.hl').length === 2);
+  const node = deepestNodeAt(r.root, 7);
+  ok('deepest node', node !== null && node.path.startsWith('regs'));
+  const treeEl = document.getElementById('tree');
+  const treeHandle = renderTree(treeEl, r.root, () => {});
+  ok('tree rows', treeEl.querySelectorAll('.node').length > 5);
+  treeHandle.highlight('addr');
+  ok('tree highlight', treeEl.querySelectorAll('.node.hl').length === 1);
+
+  // 猜测器
+  const s2 = [0, 1, 2, 3, 4].map((i) =>
+    encodeMessage(modbusMeter, { header: '55aa', addr: i + 1, func: 3, seq: 100 + i, regs: [1.5, 2.5] }),
+  );
+  const g = guessProtocol(s2);
+  ok('guess checksum', g.checksum?.algorithm === 'crc16-modbus');
+  ok('guess header', g.fields[0]?.kind === 'bytes' && g.fields[0]?.name === 'header');
+
+  // 统计
+  const stats = computeStats([r]);
+  ok('stats', stats.length > 0 && stats.some((s) => s.path === 'addr'));
+
+  document.getElementById('result').textContent = checks.join(' | ');
+</script>
+</body>
+</html>

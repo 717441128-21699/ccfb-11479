@@ -1,0 +1,16 @@
+{
+  "name": "iot-protocol-decoder",
+  "version": "0.1.0",
+  "description": "Configurable IoT binary protocol decoding platform",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "gen": "npm run build && node dist/gen/generate.js",
+    "test": "npm run build && node dist/test/run.js",
+    "serve": "node server.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^5.5.0"
+  }
+}
